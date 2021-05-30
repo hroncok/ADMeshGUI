@@ -1,0 +1,74 @@
+name: Windows C/C++ CI
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name : mxe repo
+      run: >
+        sudo apt-get update && 
+        sudo apt-get install software-properties-common lsb-release && sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 86B72ED9 &&
+        sudo add-apt-repository "deb [arch=amd64] https://pkg.mxe.cc/repos/apt `lsb_release -sc` main" &&
+        sudo apt-get update
+
+    - name: qt_windows_x64
+      run: sudo apt-get install mxe-x86-64-w64-mingw32.static-gcc mxe-x86-64-w64-mingw32.static-binutils premake4 qt5-qmake mxe-x86-64-w64-mingw32.static-qtbase mxe-x86-64-w64-mingw32.static-qtsvg
+    - name: admesh
+      run: >
+         export PATH=/usr/lib/mxe/usr/bin:$PATH &&
+         sudo mkdir -p /usr/mxe-x86-64-w64-mingw32.static &&
+         git clone https://github.com/admesh/admesh.git &&
+         cd admesh && pwd &&
+         ./autogen.sh && ./configure --host=x86_64-w64-mingw32.static --prefix=/usr/mxe-x86-64-w64-mingw32.static &&
+         make &&
+         mkdir -p ../release && cp -p .libs/libadmesh-1.dll ../release &&
+         sudo make install
+
+    - name: stlsplit
+      run: >
+        export PKG_CONFIG_PATH_x86_64_w64_mingw32_static=/usr/mxe-x86-64-w64-mingw32.static/lib/pkgconfig &&
+        export PATH=/usr/lib/mxe/usr/bin:$PATH &&
+        git clone https://github.com/udif/stlsplit &&
+        cd stlsplit && git checkout pr_staticlib &&
+        premake4 gmake config=release64 &&
+        export CXX=/usr/lib/mxe/usr/bin/x86_64-w64-mingw32.static-g++ &&
+        make -f static-lib.make INCLUDES="-I/usr/mxe-x86-64-w64-mingw32.static/include $(x86_64-w64-mingw32.static-pkg-config libadmesh --cflags)" LIBS="$(x86_64-w64-mingw32.static-pkg-config libadmesh --libs) -ladmesh" &&
+        sudo /usr/bin/install -c -m 644 build/libstlsplit.a /usr/mxe-x86-64-w64-mingw32.static/lib &&
+        sudo mkdir -p /usr/mxe-x86-64-w64-mingw32.static/include/stlsplit &&
+        sudo /usr/bin/install -c -m 644 stlsplit.h /usr/mxe-x86-64-w64-mingw32.static/include/stlsplit
+
+    - name: qmake
+      run: >
+         export PATH=/usr/lib/mxe/usr/bin:$PATH &&
+         export PKG_CONFIG_PATH_x86_64_w64_mingw32_static=/usr/mxe-x86-64-w64-mingw32.static/lib/pkgconfig &&
+         export CFLAGS1="$(x86_64-w64-mingw32.static-pkg-config libadmesh --cflags)" &&
+         export CXXFLAGS=`printf "%s %s%s"  ${CFLAGS1} ${CFLAGS1} '/stlsplit'`
+         export LDFLAGS="$(x86_64-w64-mingw32.static-pkg-config libadmesh --libs) " &&
+         /usr/lib/mxe/usr/x86_64-w64-mingw32.static/qt5/bin/qmake
+
+    - name: make
+      run: export PATH=/usr/lib/mxe/usr/bin:$PATH && make
+
+    - name: Declare some variables
+      id: vars
+      shell: bash
+      run: |
+        echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+    - name: upload windows
+      uses: actions/upload-artifact@v2
+      with:
+        name: admeshgui-${{ steps.vars.outputs.sha_short }}
+        path: |
+          release/admeshgui.exe
+          release/libadmesh-1.dll
+

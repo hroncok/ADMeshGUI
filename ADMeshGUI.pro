@@ -17,6 +17,10 @@ equals(QT_MAJOR_VERSION, 5):lessThan(QT_MINOR_VERSION, 4) {
    error(ADMeshGUI requires Qt 5.4 to run. Older version detected.)
 }
 
+QMAKE_CXXFLAGS += $$(CXXFLAGS)
+QMAKE_CFLAGS += $$(CFLAGS)
+QMAKE_LFLAGS += $$(LDFLAGS)
+
 TARGET = admeshgui
 TEMPLATE = app
 
@@ -56,7 +60,7 @@ macx {
 }
 
 win32 {
-    LIBS += -lintl -liconv
+    LIBS += -lintl -liconv -lopengl32 -ladmesh.dll
     RC_FILE = admeshgui.rc
 }
 

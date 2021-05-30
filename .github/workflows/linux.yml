@@ -1,0 +1,25 @@
+name: Linux C/C++ CI
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: qt
+      run: sudo apt install premake4 qt5-qmake qtbase5-dev libqt5svg5-dev
+    - name: admesh
+      run: git clone https://github.com/udif/admesh.git && cd admesh && ./autogen.sh && ./configure  && make && sudo make install
+    - name: stlsplit
+      run: git clone https://github.com/admesh/stlsplit && cd stlsplit && premake4 gmake && make && sudo cp stlsplit.h /usr/local/include && sudo cp -P build/libstlsplit.so* /usr/local/lib && sudo ldconfig
+    - name: qmake
+      run: qmake
+    - name: make
+      run: make
+
